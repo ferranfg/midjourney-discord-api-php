@@ -1,0 +1,17 @@
+{
+    "name": "ferranfg/midjourney-php",
+    "autoload": {
+        "psr-4": {
+            "Ferranfg\\MidjourneyPhp\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "ferran figueredo",
+            "email": "hola@ferranfigueredo.com"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^7.5"
+    }
+}
