@@ -2,6 +2,8 @@
 
 This PHP library provides a simple interface for generating images using the Midjourney Bot through the Discord API.
 
+![Midjourney PHP Library for Discord API](/img/demo.gif)
+
 ## Installation
 
 You can install this library using Composer. Run the following command in your project directory:
@@ -28,7 +30,9 @@ return $message->upscaled_photo_url;
 
 - `$discord_channel_id` - Replaces this value with the Channel ID where the Midjourney Bot is installed. You can get the Channel ID right-clicking on the channel and **Copy Channel ID**.
 
-- `$discord_user_token` - Automatic user accounts are not allowed by Discord and can result in an account termination if found, so use it at your own risk.
+    Remember that you can invite the Midjourney Bot to your own server to organize your work https://docs.midjourney.com/docs/invite-the-bot
+
+- `$discord_user_token` - Automatic user accounts (self-bots) are not allowed by Discord and can result in an account termination if found, so use it at your own risk.
 
     To get your user token, visit [https://discord.com/channels/@me](https://discord.com/channels/@me) and open the **Network** tab inside the **Developers Tools**. Find between your XHR requests the `Authorization` header.
 
