@@ -4,6 +4,10 @@ This PHP library provides a simple interface for generating images using the Mid
 
 ![Midjourney PHP Library for Discord API](/img/demo.gif)
 
+![](https://img.shields.io/packagist/dt/ferranfg/midjourney-php)
+![](https://img.shields.io/packagist/v/ferranfg/midjourney-php)
+![](https://img.shields.io/packagist/l/ferranfg/midjourney-php)
+
 ## Installation
 
 You can install this library using Composer. Run the following command in your project directory:
