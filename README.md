@@ -2,7 +2,7 @@
 
 This PHP library provides a simple interface for generating images using the Midjourney Bot through the Discord API.
 
-![Midjourney PHP Library for Discord API](/img/demo.gif)
+![Midjourney PHP Library for Discord API](/.github/img/demo.gif)
 
 ![](https://img.shields.io/packagist/dt/ferranfg/midjourney-php)
 ![](https://img.shields.io/packagist/v/ferranfg/midjourney-php)
@@ -40,7 +40,7 @@ return $message->upscaled_photo_url;
 
     To get your user token, visit [https://discord.com/channels/@me](https://discord.com/channels/@me) and open the **Network** tab inside the **Developers Tools**. Find between your XHR requests the `Authorization` header.
 
-    ![Discord User Token](/img/authorization.jpg)
+    ![Discord User Token](/.github/img/authorization.jpg)
 
 ### Methods
 
