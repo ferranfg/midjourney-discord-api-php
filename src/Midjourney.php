@@ -50,11 +50,17 @@ class Midjourney {
         self::$user_id = $response->id;
     }
 
-    private static function firstWhere($array, $key, $value)
+    private static function firstWhere($array, $key, $value = null)
     {
         foreach ($array as $item)
         {
-            if (str_starts_with($item->{$key}, $value)) return $item;
+            if (
+                (is_callable($key) and $key($item)) or
+                (is_string($key) and str_starts_with($item->{$key}, $value))
+            )
+            {
+                return $item;
+            }
         }
 
         return null;
@@ -123,7 +129,14 @@ class Midjourney {
         $response = self::$client->get('channels/' . self::$channel_id . '/messages');
         $response = json_decode((string) $response->getBody());
 
-        $raw_message = self::firstWhere($response, 'content', "**{$prompt}** - <@" . self::$user_id . '>');
+        $raw_message = self::firstWhere($response, function ($item) use ($prompt)
+        {
+            return (
+                str_starts_with($item->content, "**{$prompt}** - <@" . self::$user_id . '>') and
+                ! str_contains($item->content, '%') and
+                str_ends_with($item->content, '(fast)')
+            );
+        });
 
         if (is_null($raw_message)) return null;
 
