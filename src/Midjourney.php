@@ -2,6 +2,7 @@
 
 namespace Ferranfg\MidjourneyPhp;
 
+use Exception;
 use GuzzleHttp\Client;
 
 class Midjourney {
@@ -53,13 +54,13 @@ class Midjourney {
     {
         foreach ($array as $item)
         {
-            if ($item->{$key} == $value) return $item;
+            if (str_starts_with($item->{$key}, $value)) return $item;
         }
 
         return null;
     }
 
-    public static function imagine($prompt)
+    public function imagine(string $prompt)
     {
         $params = [
             'type' => 2,
@@ -102,57 +103,108 @@ class Midjourney {
         self::$client->post('interactions', [
             'json' => $params
         ]);
+
+        sleep(8);
+
+        $imagine_message = null;
+
+        while (is_null($imagine_message))
+        {
+            $imagine_message = $this->getImagine($prompt);
+
+            if (is_null($imagine_message)) sleep(8);
+        }
+
+        return $imagine_message;
     }
 
-    public static function getImagine($prompt)
+    public function getImagine(string $prompt)
     {
         $response = self::$client->get('channels/' . self::$channel_id . '/messages');
         $response = json_decode((string) $response->getBody());
 
-        $message = self::firstWhere($response, 'content', "**{$prompt}** - <@" . self::$user_id . '> (fast)');
+        $raw_message = self::firstWhere($response, 'content', "**{$prompt}** - <@" . self::$user_id . '>');
 
-        if (is_null($message)) return [null, null];
+        if (is_null($raw_message)) return null;
 
-        $imagine_message_id = $message->id;
-        $upscale_job_hash = null;
-
-        if (property_exists($message, 'components') and is_array($message->components))
-        {
-            $upscales = $message->components[0]->components;
-
-            $upscale_job_hash = $upscales[0]->custom_id;
-        }
-
-        return [$imagine_message_id, $upscale_job_hash];
+        return (object) [
+            'id' => $raw_message->id,
+            'prompt' => $prompt,
+            'raw_message' => $raw_message
+        ];
     }
 
-    public static function upscale($message_id, $message_hash)
+    public function upscale($message, int $upscale_index = 0)
     {
+        if ( ! property_exists($message, 'raw_message'))
+        {
+            throw new Exception('Upscale requires a message object obtained from the imagine/getImagine methods.');
+        }
+
+        if ($upscale_index < 0 or $upscale_index > 3)
+        {
+            throw new Exception('Upscale index must be between 0 and 3.');
+        }
+
+        $upscale_hash = null;
+        $raw_message = $message->raw_message;
+
+        if (property_exists($raw_message, 'components') and is_array($raw_message->components))
+        {
+            $upscales = $raw_message->components[0]->components;
+
+            $upscale_hash = $upscales[$upscale_index]->custom_id;
+        }
+
         $params = [
             'type' => 3,
             'guild_id' => self::$guild_id,
             'channel_id' => self::$channel_id,
             'message_flags' => 0,
-            'message_id' => $message_id,
+            'message_id' => $message->id,
             'application_id' => self::APPLICATION_ID,
             'session_id' => self::SESSION_ID,
             'data' => [
                 'component_type' => 2,
-                'custom_id' => $message_hash
+                'custom_id' => $upscale_hash
             ]
         ];
 
         self::$client->post('interactions', [
             'json' => $params
         ]);
+
+        $upscaled_photo_url = null;
+
+        while (is_null($upscaled_photo_url))
+        {
+            $upscaled_photo_url = $this->getUpscale($message, $upscale_index);
+
+            if (is_null($upscaled_photo_url)) sleep(3);
+        }
+
+        return $upscaled_photo_url;
     }
 
-    public static function getUpscale($prompt)
+    public function getUpscale($message, $upscale_index = 0)
     {
+        if ( ! property_exists($message, 'raw_message'))
+        {
+            throw new Exception('Upscale requires a message object obtained from the imagine/getImagine methods.');
+        }
+
+        if ($upscale_index < 0 or $upscale_index > 3)
+        {
+            throw new Exception('Upscale index must be between 0 and 3.');
+        }
+
+        $prompt = $message->prompt;
+
         $response = self::$client->get('channels/' . self::$channel_id . '/messages');
         $response = json_decode((string) $response->getBody());
 
-        $message = self::firstWhere($response, 'content', "**{$prompt}** - Image #1 <@" . self::$user_id . '>');
+        $message_index = $upscale_index + 1;
+        $message = self::firstWhere($response, 'content', "**{$prompt}** - Image #{$message_index} <@" . self::$user_id . '>');
 
         if (is_null($message))
         {
@@ -173,31 +225,12 @@ class Midjourney {
 
     public function generate($prompt, $upscale_index = 0)
     {
-        self::imagine($prompt);
+        $imagine = $this->imagine($prompt);
 
-        $imagine_message_id = null;
-        $upscale_job_hash = null;
-
-        while (is_null($imagine_message_id))
-        {
-            list($imagine_message_id, $upscale_job_hash) = self::getImagine($prompt);
-
-            if (is_null($imagine_message_id)) sleep(8);
-        }
-
-        self::upscale($imagine_message_id, $upscale_job_hash);
-
-        $upscaled_photo_url = null;
-
-        while (is_null($upscaled_photo_url))
-        {
-            $upscaled_photo_url = self::getUpscale($prompt, $upscale_index);
-
-            if (is_null($upscaled_photo_url)) sleep(3);
-        }
+        $upscaled_photo_url = $this->upscale($imagine, $upscale_index);
 
         return (object) [
-            'imagine_message_id' => $imagine_message_id,
+            'imagine_message_id' => $imagine->id,
             'upscaled_photo_url' => $upscaled_photo_url
         ];
     }
