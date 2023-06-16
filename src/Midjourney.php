@@ -4,6 +4,7 @@ namespace Ferranfg\MidjourneyPhp;
 
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\MultipartStream;
 
 class Midjourney {
 
@@ -105,8 +106,15 @@ class Midjourney {
             ]
         ];
 
+        $multipartStream = new MultipartStream([
+            [
+                'name' => 'payload_json',
+                'contents' => json_encode($params)
+            ]
+        ]);
+
         self::$client->post('interactions', [
-            'json' => $params
+            'body' => $multipartStream
         ]);
 
         sleep(8);
