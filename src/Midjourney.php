@@ -5,107 +5,134 @@ namespace Ferranfg\MidjourneyPhp;
 use Exception;
 use GuzzleHttp\Client;
 
-class Midjourney {
+/**
+ * Class allowing to create an image from a prompt and to retrieve the link of the image
+ * 
+ * Documentation Discord API : https://discord.com/developers/docs/interactions/application-commands
+ */
+class Midjourney
+{
 
-    private const API_URL = 'https://discord.com/api/v9';
+    private $apiUrl = 'https://discord.com/api/v10';    // Discord API URL
+    private $applicationId  = '936929561302675456';     // Unique ID for the application
 
-    protected const APPLICATION_ID = '936929561302675456';
+    private $dataId;            // Unique ID for the command
+    private $dataVersion;       // Unique Version for the command
 
-    protected const DATA_ID = '938956540159881230';
+    private $sessionId;         // Unique ID for the session
+    private $client;            // GuzzleHttp\Client
+    private $channel_id;        // Discord Channel ID
+    private $oauth_token;       // Discord OAuth Token User
+    private $guild_id;          // Discord Guild ID
+    private $user_id;           // Discord User ID
 
-    protected const DATA_VERSION = '1118961510123847772';
+    private $uniqueId;          // Unique ID for the prompt
 
-    protected const SESSION_ID = '2fb980f65e5c9a77c96ca01f2c242cf6';
 
-    private static $client;
-
-    private static $channel_id;
-
-    private static $oauth_token;
-
-    private static $guild_id;
-
-    private static $user_id;
-
+    /**
+     * Constructor
+     *
+     * @param string $channel_id
+     * @param string $oauth_token
+     */
     public function __construct($channel_id, $oauth_token)
     {
-        self::$channel_id = $channel_id;
-        self::$oauth_token = $oauth_token;
+        $this->sessionId = md5(uniqid());
 
-        self::$client = new Client([
-            'base_uri' => self::API_URL,
+        $this->channel_id = $channel_id;
+        $this->oauth_token = $oauth_token;
+
+        // Création du client GuzzleHttp
+        $this->client = new Client([
+            'base_uri' => $this->apiUrl,
             'headers' => [
-                'Authorization' => self::$oauth_token
+                'Authorization' => $this->oauth_token
             ]
         ]);
 
-        $request = self::$client->get('channels/' . self::$channel_id);
-        $response = json_decode((string) $request->getBody());
+        // Guild_id recovery
+        $response = $this->client->get('channels/' . $this->channel_id);
+        $body = $response->getBody()->getContents();
+        $json = json_decode($body, true);
 
-        self::$guild_id = $response->guild_id;
+        $this->guild_id = $json['guild_id'] ?? null;
 
-        $request = self::$client->get('users/@me');
-        $response = json_decode((string) $request->getBody());
+        // User_id recovery
+        $response = $this->client->get('users/@me');
+        $body = $response->getBody()->getContents();
+        $json = json_decode($body, true);
 
-        self::$user_id = $response->id;
+        $this->user_id = $json['id'];
+
+        // Retrieval of dataId and dataVersion
+        $response = $this->client->get('applications/' . $this->applicationId . '/commands');
+        $body = $response->getBody()->getContents();
+        $json = json_decode($body, true);
+
+        $this->dataId       = $json[0]['id'];
+        $this->dataVersion  = $json[0]['version'];
     }
 
-    private static function firstWhere($array, $key, $value = null)
+
+    /**
+     * Global method to recover an image
+     *
+     * @param   string      $prompt             Midjourney prompt
+     * @param   integer     $upscale_index      Choice of image to upscale - default: random 0.3
+     * @return  object
+     */
+    public function generate($prompt, $upscale_index = null)
     {
-        foreach ($array as $item)
-        {
-            if (
-                (is_callable($key) and $key($item)) or
-                (is_string($key) and str_starts_with($item->{$key}, $value))
-            )
-            {
-                return $item;
-            }
-        }
+        // Random image selection if $upscale_index is null
+        if (is_null($upscale_index)) $upscale_index = rand(0, 3);
 
-        return null;
+        $imagine = $this->imagine($prompt);
+        $upscaled_photo_url = $this->upscale($imagine, $upscale_index);
+
+        return (object) [
+            'imagine_message_id' => $imagine['id'],
+            'upscaled_photo_url' => $upscaled_photo_url
+        ];
     }
 
+
+    /**
+     * Call /imagine
+     *
+     * @param   string      $prompt     Prompt midjourney
+     * @return  void
+     */
     public function imagine(string $prompt)
     {
+        $this->uniqueId = time() - rand(0, 1000);
+        $promptWithId = $prompt . ' --seed ' . $this->uniqueId;
+
         $params = [
-            'type' => 2,
-            'application_id' => self::APPLICATION_ID,
-            'guild_id' => self::$guild_id,
-            'channel_id' => self::$channel_id,
-            'session_id' => self::SESSION_ID,
+            'type'              => 2,
+            'application_id'    => $this->applicationId,
+            'guild_id'          => $this->guild_id,
+            'channel_id'        => $this->channel_id,
+            'session_id'        => $this->sessionId,
             'data' => [
-                'version' => self::DATA_VERSION,
-                'id' => self::DATA_ID,
-                'name' => 'imagine',
-                'type' => 1,
-                'options' => [[
-                    'type' => 3,
-                    'name' => 'prompt',
-                    'value' => $prompt
-                ]],
-                'application_command' => [
-                    'id' => self::DATA_ID,
-                    'application_id' => self::APPLICATION_ID,
-                    'version' => self::DATA_VERSION,
-                    'default_member_permissions' => null,
-                    'type' => 1,
-                    'nsfw' => false,
-                    'name' => 'imagine',
-                    'description' => 'Create images with Midjourney',
-                    'dm_permission' => true,
-                    'options' => [[
-                        'type' => 3,
-                        'name' => 'prompt',
-                        'description' => 'The prompt to imagine',
-                        'required' => true
-                    ]]
+                'id'        => $this->dataId,
+                'version'   => $this->dataVersion,
+                'name'      => 'imagine',
+                'type'      => 1,
+                'options'   => [
+                    [
+                        'type'  => 3,
+                        'name'  => 'prompt',
+                        'value' => $promptWithId
+                    ],
                 ],
-                'attachments' => []
-            ]
+            ],
         ];
 
-        self::$client->post('interactions', [
+        if (is_null($this->guild_id)) {
+            unset($params['guild_id']);
+        }
+
+        $this->client->post('interactions', [
             'json' => $params
         ]);
 
@@ -113,137 +140,171 @@ class Midjourney {
 
         $imagine_message = null;
 
-        while (is_null($imagine_message))
-        {
-            $imagine_message = $this->getImagine($prompt);
+        // Max time loop: just over 5 minutes of waiting
+        $maxLoop = 40;
 
+        while (is_null($imagine_message)) {
+            $maxLoop--;
+            if ($maxLoop == 0) break;
+
+            $imagine_message = $this->getImagine();
             if (is_null($imagine_message)) sleep(8);
         }
 
         return $imagine_message;
     }
 
-    public function getImagine(string $prompt)
-    {
-        $response = self::$client->get('channels/' . self::$channel_id . '/messages');
-        $response = json_decode((string) $response->getBody());
 
-        $raw_message = self::firstWhere($response, function ($item) use ($prompt)
-        {
-            return (
-                str_starts_with($item->content, "**{$prompt}** - <@" . self::$user_id . '>') and
-                ! str_contains($item->content, '%') and
-                str_ends_with($item->content, '(fast)')
-            );
-        });
+    /**
+     * Method to retrieve the Midjourney message and identify when the 4 visuals are ready
+     * 
+     * @return void
+     */
+    public function getImagine()
+    {
+        $response = $this->client->get('channels/' . $this->channel_id . '/messages');
+        $response = $response->getBody()->getContents();
+        $items = json_decode($response, true);
+
+        $raw_message = null;
+
+        foreach ($items as $item) {
+            if (
+                str_contains($item['content'], $this->uniqueId) &&
+                str_contains($item['content'], '<@' . $this->user_id . '> (fast)')
+            ) {
+                $raw_message = $item;
+                break;
+            }
+
+            if (is_null($raw_message)) {
+                if (
+                    str_contains($item['content'], $this->uniqueId) &&
+                    str_contains($item['content'], '<@' . $this->user_id . '> (Open on website for full quality) (fast)')
+                ) {
+                    $raw_message = $item;
+                    break;
+                }
+            }
+        }
 
         if (is_null($raw_message)) return null;
 
-        return (object) [
-            'id' => $raw_message->id,
-            'prompt' => $prompt,
-            'raw_message' => $raw_message
+        return [
+            'id'            => $raw_message['id'],
+            'raw_message'   => $raw_message
         ];
     }
 
-    public function upscale($message, int $upscale_index = 0)
+
+    /**
+     * Method to upscale an image of Midjourney among the 4 proposed
+     * 
+     * @param   array   $message            Array returned by the getImagine method
+     * @param   integer $upscale_index      Choice of image to upscale (0.3)
+     * @return  void
+     */
+    public function upscale($message, int $upscale_index)
     {
-        if ( ! property_exists($message, 'raw_message'))
-        {
+        if (!isset($message['raw_message'])) {
             throw new Exception('Upscale requires a message object obtained from the imagine/getImagine methods.');
         }
 
-        if ($upscale_index < 0 or $upscale_index > 3)
-        {
+        if ($upscale_index < 0 or $upscale_index > 3) {
             throw new Exception('Upscale index must be between 0 and 3.');
         }
 
         $upscale_hash = null;
-        $raw_message = $message->raw_message;
+        $raw_message = $message['raw_message'];
 
-        if (property_exists($raw_message, 'components') and is_array($raw_message->components))
-        {
-            $upscales = $raw_message->components[0]->components;
-
-            $upscale_hash = $upscales[$upscale_index]->custom_id;
+        if (isset($raw_message['components']) && is_array($raw_message['components'])) {
+            $upscales = $raw_message['components'][0]['components'];
+            $upscale_hash = $upscales[$upscale_index]['custom_id'];
         }
 
         $params = [
-            'type' => 3,
-            'guild_id' => self::$guild_id,
-            'channel_id' => self::$channel_id,
-            'message_flags' => 0,
-            'message_id' => $message->id,
-            'application_id' => self::APPLICATION_ID,
-            'session_id' => self::SESSION_ID,
+            'type'              => 3,
+            'guild_id'          => $this->guild_id,
+            'channel_id'        => $this->channel_id,
+            'message_flags'     => 0,
+            'message_id'        => $message['id'],
+            'application_id'    => $this->applicationId,
+            'session_id'        => $this->sessionId,
             'data' => [
                 'component_type' => 2,
-                'custom_id' => $upscale_hash
+                'custom_id'     => $upscale_hash
             ]
         ];
 
-        self::$client->post('interactions', [
+        if (is_null($this->guild_id)) {
+            unset($params['guild_id']);
+        }
+
+        $this->client->post('interactions', [
             'json' => $params
         ]);
 
         $upscaled_photo_url = null;
 
-        while (is_null($upscaled_photo_url))
-        {
-            $upscaled_photo_url = $this->getUpscale($message, $upscale_index);
+        // Max time loop: 3 minutes
+        $maxLoop = 60;
 
+        while (is_null($upscaled_photo_url)) {
+            $maxLoop--;
+            if ($maxLoop == 0) break;
+
+            $upscaled_photo_url = $this->getUpscale($message, $upscale_index);
             if (is_null($upscaled_photo_url)) sleep(3);
         }
 
         return $upscaled_photo_url;
     }
 
+
+    /**
+     * Method to check if the upscaled image is ready
+     * 
+     * @param   array   $message            Array returned by the getImagine method
+     * @param   integer $upscale_index      Choice of image to upscale (0.3)
+     * @return  void
+     */
     public function getUpscale($message, $upscale_index = 0)
     {
-        if ( ! property_exists($message, 'raw_message'))
-        {
+        if (!isset($message['raw_message'])) {
             throw new Exception('Upscale requires a message object obtained from the imagine/getImagine methods.');
         }
 
-        if ($upscale_index < 0 or $upscale_index > 3)
-        {
+        if ($upscale_index < 0 || $upscale_index > 3) {
             throw new Exception('Upscale index must be between 0 and 3.');
         }
 
-        $prompt = $message->prompt;
-
-        $response = self::$client->get('channels/' . self::$channel_id . '/messages');
-        $response = json_decode((string) $response->getBody());
+        $response = $this->client->get('channels/' . $this->channel_id . '/messages');
+        $response = $response->getBody()->getContents();
+        $items = json_decode($response, true);
 
         $message_index = $upscale_index + 1;
-        $message = self::firstWhere($response, 'content', "**{$prompt}** - Image #{$message_index} <@" . self::$user_id . '>');
+        $message = null;
 
-        if (is_null($message))
-        {
-            $message = self::firstWhere($response, 'content', "**{$prompt}** - Upscaled by <@" . self::$user_id . '> (fast)');
+        foreach ($items as $item) {
+            if (
+                str_contains($item['content'], $this->uniqueId) &&
+                str_contains($item['content'], "Image #{$message_index} <@{$this->user_id}>")
+            ) {
+                $message = $item;
+                break;
+            }
+
+            if (is_null($message)) {
+                if (
+                    str_contains($item['content'], $this->uniqueId) &&
+                    str_contains($item['content'], "Upscaled by <@{$this->user_id}> (fast)")
+                ) {
+                    $message = $item;
+                    break;
+                }
+            }
         }
 
-        if (is_null($message)) return null;
-
-        if (property_exists($message, 'attachments') and is_array($message->attachments))
-        {
-            $attachment = $message->attachments[0];
-
-            return $attachment->url;
-        }
-
-        return null;
-    }
-
-    public function generate($prompt, $upscale_index = 0)
-    {
-        $imagine = $this->imagine($prompt);
-
-        $upscaled_photo_url = $this->upscale($imagine, $upscale_index);
-
-        return (object) [
-            'imagine_message_id' => $imagine->id,
-            'upscaled_photo_url' => $upscaled_photo_url
-        ];
+        return (!is_null($message) && isset($message['attachments'])) ? $message['attachments'][0]['url'] : null;
     }
 }
