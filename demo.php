@@ -4,8 +4,8 @@ include 'vendor/autoload.php';
 
 use Ferranfg\MidjourneyPhp\Midjourney;
 
-$discord_channel_id = '';
-$discord_user_token = '';
+$discord_channel_id = 'YOUR_DISCORD_CHANNEL_ID';
+$discord_user_token = 'YOUR_DISCORD_USER_TOKEN';
 
 $midjourney = new Midjourney($discord_channel_id, $discord_user_token);
 
