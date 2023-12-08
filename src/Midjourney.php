@@ -13,7 +13,7 @@ class Midjourney {
 
     protected const DATA_ID = '938956540159881230';
 
-    protected const DATA_VERSION = '1118961510123847772';
+    protected const DATA_VERSION = '1166847114203123795';
 
     protected const SESSION_ID = '2fb980f65e5c9a77c96ca01f2c242cf6';
 
