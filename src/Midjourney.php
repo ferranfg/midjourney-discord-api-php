@@ -188,11 +188,20 @@ class Midjourney {
 
         $upscaled_photo_url = null;
 
+        $startTime = time();
+        $max_time_to_find_upscaled_link = 60 * 5;
+
         while (is_null($upscaled_photo_url))
         {
             $upscaled_photo_url = $this->getUpscale($message, $upscale_index);
 
-            if (is_null($upscaled_photo_url)) sleep(3);
+            if (is_null($upscaled_photo_url)) {
+                sleep(3);
+
+                if ((time() - $startTime) >= $max_time_to_find_upscaled_link) {
+                    throw new Exception("Upscale photo URL could not be found within the specified time limit.");
+                }
+            }
         }
 
         return $upscaled_photo_url;
