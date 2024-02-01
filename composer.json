@@ -1,25 +1,16 @@
 {
-    "name": "ferranfg/midjourney-php",
-    "description": "Generate images using Midjourney Bot through the Discord API.",
-    "keywords": ["midjourney", "midjourney-bot", "midjourney-api-bot"],
-    "license": "MIT",
-    "support": {
-        "issues": "https://github.com/ferranfg/midjourney-discord-api-php/issues",
-        "source": "https://github.com/ferranfg/midjourney-discord-api-php"
-    },
-    "autoload": {
-        "psr-4": {
-            "Ferranfg\\MidjourneyPhp\\": "src/"
-        }
-    },
-    "authors": [
-        {
-            "name": "ferran figueredo",
-            "email": "hola@ferranfigueredo.com"
-        }
-    ],
-    "require": {
-        "php": "^8.1",
-        "guzzlehttp/guzzle": "^7.5"
+  "require": {
+    "ajaska-gmbh/midjourney-discord-api-php": "main"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "name": "ajaska-gmbh/midjourney-discord-api-php",
+      "url": "https://github.com/ajaska-gmbh/midjourney-discord-api-php"
     }
-}
+  ],
+  "config": {
+    "preferred-install": {
+      "ajaska-gmbh/*": "source"
+    }
+  }
